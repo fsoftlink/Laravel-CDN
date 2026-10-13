@@ -1,0 +1,1140 @@
+LARAVEL INTERVIEW NOTES
+// Inside Boot Function of app/Providers/AppServiceProviders
+// gates can be used at any place 
+
+Gate::define('isAdmin', function(User $user){
+	return $user->role === 'admin';
+});
+
+Event::listen(
+	UserRegistered::class,
+	SendWelcomeEmail::class
+);
+
+Now gated can be use like 
+
+At route
+Route::get('/admin/dashboard', [AdminController::class, 'index'])->can('isAdmin');
+
+At Blade
+
+@can('isAdmin')
+    <a href="/admin">Admin Panel</a>
+@else
+	<a href="/admin">User Panel</a>
+@endcan
+
+@cannot('isAdmin')
+    <a href="/admin">Admin Panel</a>
+@endcan
+
+
+At Controller
+if (Gate::allows('isAdmin')) {
+    // Perform admin task
+}
+
+if (Gate::denies('isAdmin')) {
+    // Perform admin task
+}
+
+
+// Or automatically authorize (throws 403 HTTP error if unauthorized):
+
+Gate::authorize('isAdmin');
+
+Middleware
+Route::middleware(['can:isAdmin'])->group(function () {
+    // Admin routes go here
+});
+
+
+Policy use is same as gate , just replase gate string with policy class method name 
+
+php artisan make:policy StudentPolicy --model=Student
+
+इससे app/Policies/StudentPolicy.php बनेगी। Laravel इसे सामान्य naming convention के अनुसार auto-discover कर सकता है।
+
+// app/Policies/StudentPolicy.php
+public function update(User $user, Student $student): bool{
+    return $user->id === $student->user_id;
+}
+
+
+
+2. //Create Event
+
+	php artisan make:event UserRegistered
+
+	INFO  Event [E:\LARAVEL\a_ecom2\app\Events\UserRegistered.php] created successfully. 
+
+	php artisan make:listener SendWelcomeEmail
+
+	INFO  Listener [E:\LARAVEL\a_ecom2\app\Listeners\SendWelcomeEmail.php] created successfully.
+
+	// Clear OTP from session after successful registration
+	session()->forget('otp');
+
+	// Event Dispatch Karna
+	UserRegistered::dispatch($user);
+	//event(new UserRegistered($user));
+
+	// Welcome Email Job Create karna and add env QUEUE_CONNECTION=database
+	SendWelcomeEmailJob::dispatch($user);
+	
+	session()->flash('success','User registered successfully.');
+	return response()->json(['status' => true, 'message' => 'User registered successfully.']);
+
+
+3. Mail in LARAVEL
+
+	php artisan make:mail WelcomeMail
+	
+	create a WelcomeMail Class in app/Mail 
+	
+	
+	
+
+INSTALL DEPENDENCIES IN LETEST PROJECT
+
+composer require guzzlehttp/guzzle
+php artisan install:api
+composer require openai-php/client stripe/stripe-php
+
+php artisan make:model FcmToken -m
+
+1. Laravel Complete Flow Diagram
+
+    1. Browser → public/index.php, yahi pe maintanance file 503 response karta h agar persent ho to
+                    ↓
+    2. index.php → require bootstrap/app.php
+                    ↓
+    3. bootstrap/app.php:
+    ├── Application::configure()
+    ├── withRouting()      → routes load करो
+    ├── withMiddleware()   → aliases + redirects set करो
+    ├── withExceptions()   → exception handlers set करो
+    └── create()           → app बनाओ
+                    ↓
+    4. Request → Middleware → Route → Controller → Response
+                    ↓
+    5. Browser को response
+
+0. Route List 
+ php artisan route:list | findstr shipping
+ php artisan route:list | findstr sanctum
+
+  GET|HEAD        admin/shipping ............................. shipping.index ??? admin\ShippingController@index
+  POST            admin/shipping ............................. shipping.store ??? admin\ShippingController@store
+  GET|HEAD        admin/shipping/create .................... shipping.create ??? admin\ShippingController@create
+  GET|HEAD        admin/shipping/{shipping} .................... shipping.show ??? admin\ShippingController@show
+  PUT|PATCH       admin/shipping/{shipping} ................ shipping.update ??? admin\ShippingController@update
+  DELETE          admin/shipping/{shipping} .............. shipping.destroy ??? admin\ShippingController@destroy
+  GET|HEAD        admin/shipping/{shipping}/edit ............... shipping.edit ??? admin\ShippingController@edit
+
+
+1. ye seed command bhi chala deta h
+php artisan migrate:fresh --seed
+
+2. ye drop kar ke new table crete karta h
+php artisan migrate:fresh
+
+3. Create controller command
+
+php artisan make:controller admin/AdminController
+php artisan make:controller admin/AdminReviewController
+
+
+4. Add helper to composer.json
+
+"files": [
+    "app/Helpers/helper.php"
+]
+composer dump-autoload
+
+5. create console command in laravel
+php artisan make:command DeleteOldUsers 
+
+6. storage link karna
+ php artisan storage:link
+
+7. cart package 3rd party library install
+composer require anayarojo/shoppingcart
+
+8. Email Bhejne ke liye 
+php artisan make:mail OtpMail
+php artisan make:mail OrderMail
+
+9. validate ke sare methods
+    // signature
+    $validator = Validator::make($req->all(), $rules);
+
+    $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+    $validator->passes();                    // true agar validation pass ho
+    $validator->fails();                     // true agar validation fail ho
+    
+    more methods are inside one note
+
+10. session set and get
+    session(['otp' => $otp]);   // set otp
+
+    $otp = session('otp');  // get otp
+
+    session()->forget('otp');  // forget otp
+
+    // User: /checkout पर जाना चाहता था, पर logged-in नहीं था
+    // → Laravel ने /login पर भेजा और '/checkout' session में save किया
+
+    // Login के बाद:
+    if (session()->has('url.intended')) {
+        return redirect(session()->get('url.intended')); // /checkout पर भेजो
+    }
+    return redirect()->intended(route('front.home')); // वरना home पर
+
+
+11. Return redirect with error and with input
+    return redirect()->route('front.userLogin')->withInput()->withErrors($validator);
+
+    get it at blade via
+    @error('password')
+        <p class="text-danger">{{ $message }}</p>
+    @enderror
+
+    value="{{ old('email') }}"
+
+12. Password change process
+
+    $user = User::select('id', 'password')->where('id', Auth::user()->id)->first();
+
+    if (!Hash::check($request->old_password, $user->password)) {
+        session()->flash('error', 'Current Password is incorrect');
+        return response()->json([ 'status' => true, ]);
+    }
+
+12. Account Delete Process
+
+    $user = User::select('id', 'password', 'status')->where('id', Auth::id())->first();
+
+    if (!$user || !Hash::check($request->deletion_password, $user->password)) {
+        session()->flash('error', 'Password is incorrect');
+        return response()->json([ 'status' => false, ]);
+    }
+    $user->delete(); // Soft delete the user
+
+    id	name	email	        deleted_at
+    1	Rahul	rahul@gmail.com	NULL
+
+    अगर आपके User मॉडल में SoftDeletes trait लगा हुआ है, तो रिकॉर्ड ऐसा हो जाएगा:
+    class User extends Authenticatable   {
+        use HasFactory, Notifiable, SoftDeletes;
+    }
+
+    id	name	email	        deleted_at
+    1	Rahul	rahul@gmail.com	2026-10-10 ...
+
+    3. Deleted User को कैसे प्राप्त करें?
+     
+        User::all();    // सामान्य यूज़र
+        User::withTrashed()->get();     // Soft deleted यूज़र सहित सभी यूज़र   
+        User::onlyTrashed()->get();    // केवल Soft deleted यूज़र
+
+    in migration add $table->softDeletes(); to create soft delete column
+
+    4. Deleted User को वापस कैसे लाएँ?
+ 
+        $user = User::withTrashed()->find($id);
+        if ($user) {        $user->restore();    }
+
+    5. Permanently Delete कैसे करें?
+        $user->forceDelete();
+
+13. Wishlist dekhne ke liye
+    $wishlists = Whishlist::where('user_id', Auth::user()->id)->with('product')->get();
+    return view('front.profile.whishlist', compact('wishlists'));
+
+14. Guard क्या होता है? (Basic)  Simple Definition:  Guard = "User को authenticate करने का तरीका"
+
+जब कोई user login करता है, तो Laravel को पता होना चाहिए:
+कहाँ से check करें? (session? token? cookie?)
+किस table/model से user लाएँ? (users? admins? managers?)
+Login के बाद कहाँ store करें? (session? database?)
+Guard यही सब decide करता है।
+
+Real-life Analogy:
+सोचो एक office building है:
+Main Gate (web guard) → normal employees के लिए
+Admin Entrance (admin guard) → admin staff के लिए
+Manager Wing (manager guard) → managers के लिए
+हर entrance का अपना security system है, अपना ID card है, अपना record है।
+यही Laravel में guard है।
+config ke andar auth.php me guards define hote h
+
+Laravel config ko cache kar leta h so clear it to use new guard
+
+php artisan config:clear
+php artisan cache:clear
+php artisan optimize:clear 
+
+15. Trait kaise banaye Laravel me
+    1 first baar me folder create hua and second baar se aapko Traits hata dena hoga nahi 
+    to fir se ek folder banjayega
+    
+    php artisan make:trait Traits/CategoryList
+    php artisan make:trait BrandList
+    php artisan make:trait ProductList
+
+16. Create Form Request for Better  separate validation
+php artisan make:request StoreUserRequest
+
+17. Gates are defined inside app/Providers/AppServiceProvider ke boot method  me
+    Gate::define('isAdmin', function(User $user){
+        return $user->role == 'admin';
+    });
+
+    multiple gate lagane ke karan gate ka code thoda sa messy ho jata h
+
+18. Policy is similar to gate but u define diff policy for diff model
+    policy file separate hoti h isiliye messy nahi hota
+
+php artisan make:policy UserPolicy
+INFO  Policy [E:\LARAVEL\a_ecom2\app\Policies\UserPolicy.php] created successfully. 
+
+19. Seeder 
+
+php artisan make:seeder ProductSeeder
+ INFO  Seeder [E:\LARAVEL\a_ecom2\database\seeders\ProductSeeder.php] created successfully.  
+
+20. Factory 
+
+php artisan make:factory ProductFactory --model=Product
+
+INFO  Factory [E:\LARAVEL\a_ecom2\database\factories\ProductFactory.php] created successfully.  
+
+21. Components in Laravel Calss Based Components and Anonymous Components
+
+   php artisan make:component Alert
+
+   INFO  Component [E:\LARAVEL\a_ecom2\app\View\Components\Alert.php] created successfully.  
+
+   INFO  View [E:\LARAVEL\a_ecom2\resources\views\components\alert.blade.php] created successfully.
+
+22. Event and Listeners in Laravel
+
+    php artisan make:event UserRegistered
+    INFO  Event [E:\LARAVEL\a_ecom2\app\Events\UserRegistered.php] created successfully. 
+
+    php artisan make:listener SendWelcomeEmail
+    INFO  Listener [E:\LARAVEL\a_ecom2\app\Listeners\SendWelcomeEmail.php] created successfully.
+
+    php artisan make:mail WelcomeEmail
+    INFO  Mailable [E:\LARAVEL\a_ecom2\app\Mail\WelcomeEmail.php] created successfully. 
+
+23. Job ek PHP class hoti hai jisme aap background me hone wala kaam define karte ho.
+
+    php artisan make:job SendWelcomeEmailJob
+
+    INFO  Job [E:\LARAVEL\a_ecom2\app\Jobs\SendWelcomeEmailJob.php] created successfully. 
+
+    php artisan make:queue-table
+    php artisan migrate
+
+    // worker queue chalana
+    php artisan queue:work
+
+
+
+
+
+	
+# Laravel Guard क्या होता है? (Hindi में समझें)
+
+Laravel में **Guard का काम यह तय करना होता है कि आने वाली Request में User Login है या नहीं और किस Authentication System से Login है।**
+
+आसान भाषा में:
+
+- **Guard** → User को कैसे authenticate करना है?
+- **Provider** → User का data कहाँ से लाना है?
+- **Middleware** → कौन-सा route authenticated user access कर सकता है?
+
+## 1. Laravel में Default Guard
+
+Laravel में `config/auth.php` फाइल होती है।
+
+```php
+'defaults' => [
+    'guard' => env('AUTH_GUARD', 'web'),
+    'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+],
+```
+
+यहाँ `web` default guard है।
+
+इसका मतलब Laravel सामान्यतः Session के जरिए User को authenticate करेगा।
+
+### Guards Configuration
+
+```php
+'guards' => [
+    'web' => [
+        'driver' => 'session',
+        'provider' => 'users',
+    ],
+],
+```
+
+यहाँ तीन बातें समझिए:
+
+| Property | काम |
+|---|---|
+| `web` | Guard का नाम |
+| `session` | Authentication कैसे maintain होगा |
+| `users` | User का data किस provider से आएगा |
+
+---
+
+# 2. Guard और Provider में अंतर
+
+मान लीजिए आपके School Management ERP में तीन प्रकार के users हैं:
+
+1. Admin
+2. Teacher
+3. Student
+
+आप चाहते हैं कि तीनों के login अलग-अलग हों।
+
+उदाहरण:
+
+```text
+/admin/login
+/teacher/login
+/student/login
+```
+
+इसके लिए Laravel में अलग-अलग Guards बना सकते हैं।
+
+### Step 1: config/auth.php
+
+```php
+'guards' => [
+
+    'web' => [
+        'driver' => 'session',
+        'provider' => 'users',
+    ],
+
+    'admin' => [
+        'driver' => 'session',
+        'provider' => 'admins',
+    ],
+
+    'teacher' => [
+        'driver' => 'session',
+        'provider' => 'teachers',
+    ],
+
+    'student' => [
+        'driver' => 'session',
+        'provider' => 'students',
+    ],
+
+],
+```
+
+### Step 2: Providers Configure करें
+
+```php
+'providers' => [
+
+    'users' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\User::class,
+    ],
+
+    'admins' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Admin::class,
+    ],
+
+    'teachers' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Teacher::class,
+    ],
+
+    'students' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Student::class,
+    ],
+
+],
+```
+
+अब Laravel को पता है:
+
+| Guard | Provider | Model | Table |
+|---|---|---|---|
+| web | users | User | users |
+| admin | admins | Admin | admins |
+| teacher | teachers | Teacher | teachers |
+| student | students | Student | students |
+
+ध्यान दें: Models में `Authenticatable` implementation होना चाहिए। Laravel का default User model यह सुविधा देता है।
+
+---
+
+# 3. Guard से Login कैसे करें?
+
+### Admin Login
+
+```php
+use Illuminate\Support\Facades\Auth;
+
+public function adminLogin(Request $request)
+{
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
+
+    if (Auth::guard('admin')->attempt($credentials)) {
+
+        $request->session()->regenerate();
+
+        return redirect('/admin/dashboard');
+    }
+
+    return back()->withErrors([
+        'email' => 'Invalid credentials',
+    ]);
+}
+```
+
+यहाँ:
+
+```php
+Auth::guard('admin')->attempt($credentials);
+```
+
+Laravel `admin` guard के provider से Admin model का इस्तेमाल करके credentials verify करेगा।
+
+### Teacher Login
+
+```php
+Auth::guard('teacher')->attempt($credentials);
+```
+
+### Student Login
+
+```php
+Auth::guard('student')->attempt($credentials);
+```
+
+---
+
+# 4. Guard से Logged-in User की जानकारी निकालना
+
+### Admin
+
+```php
+Auth::guard('admin')->user();
+```
+
+Admin ID:
+
+```php
+Auth::guard('admin')->id();
+```
+
+Login Check:
+
+```php
+Auth::guard('admin')->check();
+```
+
+### Teacher
+
+```php
+Auth::guard('teacher')->user();
+```
+
+### Student
+
+```php
+Auth::guard('student')->user();
+```
+
+**महत्वपूर्ण:** अगर आप केवल `Auth::user()` लिखते हैं, तो सामान्यतः default guard इस्तेमाल होगा।
+
+---
+
+# 5. Guard को Middleware में इस्तेमाल करना
+
+मान लीजिए Admin Dashboard केवल Admin access कर सकता है।
+
+`routes/web.php`
+
+```php
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\TeacherController;
+use App\Http\Controllers\StudentController;
+
+Route::middleware('auth:admin')->group(function () {
+
+    Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
+
+});
+
+Route::middleware('auth:teacher')->group(function () {
+
+    Route::get('/teacher/dashboard', [TeacherController::class, 'dashboard']);
+
+});
+
+Route::middleware('auth:student')->group(function () {
+
+    Route::get('/student/dashboard', [StudentController::class, 'dashboard']);
+
+});
+```
+
+यहाँ:
+
+```php
+auth:admin
+```
+
+का मतलब है कि इस route को access करने के लिए `admin` guard से login होना जरूरी है।
+
+इसी तरह:
+
+```php
+auth:teacher
+auth:student
+```
+
+---
+
+# 6. Guard से Logout कैसे करें?
+
+Admin Logout:
+
+```php
+Auth::guard('admin')->logout();
+
+$request->session()->invalidate();
+$request->session()->regenerateToken();
+```
+
+Teacher Logout:
+
+```php
+Auth::guard('teacher')->logout();
+```
+
+Student Logout:
+
+```php
+Auth::guard('student')->logout();
+```
+
+ध्यान दें: Session invalidate करने से उसी browser session में दूसरे guards की login state भी समाप्त हो सकती है।
+
+---
+
+# 7. क्या एक ही Users Table के लिए Multiple Guards बना सकते हैं?
+
+**हाँ, बिल्कुल।**
+
+मान लीजिए आपकी `users` table में:
+
+| id | name | email | role |
+|---|---|---|---|
+| 1 | Kuldip | admin@gmail.com | admin |
+| 2 | Rahul | teacher@gmail.com | teacher |
+| 3 | Amit | student@gmail.com | student |
+
+आपके पास केवल एक Model है:
+
+```php
+App\Models\User::class
+```
+
+अब `config/auth.php` में:
+
+```php
+'guards' => [
+
+    'web' => [
+        'driver' => 'session',
+        'provider' => 'users',
+    ],
+
+    'admin' => [
+        'driver' => 'session',
+        'provider' => 'users',
+    ],
+
+    'teacher' => [
+        'driver' => 'session',
+        'provider' => 'users',
+    ],
+
+],
+```
+
+तीनों Guards एक ही `users` provider इस्तेमाल कर रहे हैं।
+
+**लेकिन एक महत्वपूर्ण बात:**
+
+```php
+Auth::guard('admin')->attempt([
+    'email' => $request->email,
+    'password' => $request->password,
+]);
+```
+
+यह अपने आप `role = admin` check नहीं करेगा।
+
+इसके लिए:
+
+```php
+Auth::guard('admin')->attempt([
+    'email' => $request->email,
+    'password' => $request->password,
+    'role' => 'admin',
+]);
+```
+
+इसी तरह Teacher के लिए:
+
+```php
+Auth::guard('teacher')->attempt([
+    'email' => $request->email,
+    'password' => $request->password,
+    'role' => 'teacher',
+]);
+```
+
+इसके अतिरिक्त protected routes पर role-based authorization भी लागू करें। केवल guard का नाम `admin` रखने से user को admin permissions नहीं मिलतीं।
+
+---
+
+# 8. Guard और Role में सबसे बड़ा अंतर
+
+यह Laravel Interview में महत्वपूर्ण सवाल है।
+
+| Guard | Role |
+|---|---|
+| Authentication के लिए | Authorization के लिए |
+| User Login है या नहीं | User क्या कर सकता है |
+| `Auth::guard('admin')` | `$user->role === 'admin'` |
+| Session या Token आधारित | Permissions आधारित |
+| `config/auth.php` में configure | Database/Policies/Gates में manage |
+
+### उदाहरण
+
+```php
+Auth::check();
+```
+
+यह बताता है कि User login है या नहीं।
+
+जबकि:
+
+```php
+Auth::user()->role === 'admin';
+```
+
+यह बताता है कि User admin है या नहीं।
+
+---
+
+## 9. आपके Project के लिए मेरी सलाह
+
+अगर आपके Laravel project में एक ही `users` table है और उसमें:
+
+```php
+role = admin
+role = manager
+role = user
+```
+
+तो **अलग-अलग Guards बनाना जरूरी नहीं है।**
+
+आप एक ही `web` Guard रख सकते हैं और Roles के लिए Middleware या Laravel Policies इस्तेमाल कर सकते हैं।
+
+लेकिन अगर आपके पास अलग-अलग tables हैं:
+
+```text
+admins
+teachers
+students
+parents
+```
+
+तो अलग-अलग Guards उपयोगी हो सकते हैं।
+
+### एक महत्वपूर्ण सवाल
+
+आपके Laravel project में कौन-सा structure है?
+
+**Option A:** एक ही `users` table है, जिसमें `role` column है।
+
+**Option B:** `admins`, `users`, `managers` की अलग-अलग tables हैं।
+
+इसके आधार पर मैं आपको **Laravel Guard + Provider + Middleware + Login का पूरा practical implementation** समझा सकता हूँ।
+
+
+public function updateProfile($id, Request $request)
+{
+	/** @var \App\Models\User $user */
+	$user = Auth::user();
+	if (!$user) {
+		return response()->json(['status' => false, 'message' => 'Unauthenticated'], 401);
+	}
+	$validator = Validator::make($request->all(), [
+		'name' => 'required',
+		'phone' => 'required',
+		'avatar' => 'image|mimes:jpeg,png,jpg,webp|max:2048'
+	]);
+	if ($validator->fails()) {
+		return edie([
+			'status' => 'error',
+			'message' => $validator->errors()->first(),
+			'errors' => $validator->errors()
+		], 200);
+	}
+
+	//dd($request->all());
+	$user->name = $request->name;
+	$user->phone = $request->phone;
+
+	if ($request->hasFile('avatar')) {
+		$image = $request->file('avatar');
+
+		$imagePath = public_path('uploads/profiles/' . $user->avatar);
+
+		if ($user->avatar && File::exists($imagePath)) {    File::delete($imagePath);     }
+
+		$imageName = $user->id . '.' . $image->getClientOriginalExtension();
+		$image->move(public_path('uploads/profiles'), $imageName);
+
+		$user->avatar = $imageName;
+	}
+
+	$user->save();
+
+	session()->flash('success', 'Profile Updated');
+
+	return edie(['status' => 'success', 'message' => 'Profile Updated', 'reload' => 'reload']);
+}
+
+
+
+
+ORM
+
+		use App\Models\FcmToken;
+	
+	FcmToken::create([
+	    'user_id' => $userId,
+	    'fid' => $fid,
+	    'fcm_token' => $fcmToken,
+	    'device_type' => 'web'
+	]);
+	
+	FcmToken::upsert(
+	    [
+	        ['fid' => $fid, 'user_id' => $userId, 'fcm_token' => $fcmToken, 'device_type' => 'web']
+	    ],
+	    ['fid'], // Unique column to match
+	    ['fcm_token', 'user_id', 'updated_at'] // Columns to update if match found
+	);
+	
+	FcmToken::updateOrCreate(
+	    ['fid' => $fid], // Matching condition (Unique Key)
+	    [
+	        'user_id' => $userId,
+	        'fcm_token' => $fcmToken,
+	        'device_type' => 'web'
+	    ] // Update or Insert values
+	);
+	
+	User::destroy($id); // Primary ID se direct delete
+	
+	1. Step by step Eloquent ORM details. At the end use ->get() to get data
+	
+	if (User::where('id', 2)->exists()) {
+		// your code here
+	}
+	if (User::where('id', 2)->doesntExist()) {
+		// your code here
+	}
+	
+	$users = User::all();
+	SELECT * FROM users
+	
+	$users = User::select('name','age')->get();
+	$users = User::selectRaw('name,age')->get();
+	$users = User::orderBy('name','age')->get();
+	$users = User::orderByRaw('name,age')->get();
+	
+	
+	SELECT name, age FROM users;
+	
+	$users = User::find(2);
+	SELECT * FROM users WHERE id = 2
+	
+	$users = User::find(2,['name','age']);
+	SELECT name, age FROM users WHERE id = 2;
+	
+	$users = User::find(2,['name','age']);
+	SELECT name, age FROM users WHERE id = 2;
+	
+	$users = User::find([2,4],['name','age']);
+	SELECT name, age FROM users WHERE id IN (2,4);
+	
+	$users = User::count();
+	SELECT count(*) FROM users;
+	
+	$users = User::max('age');
+	SELECT max(age) FROM users;
+	
+	$users = User::min('age');
+	$users = User::max('age');
+	$users = User::sum('age');
+	
+	$users = User::where('city', 'Delhi')->get();
+	SELECT * FROM users WHERE city = 'Delhi';
+	
+	$users = User::where('city', 'Delhi')->where('age','>',20)->get();
+	$users = User::where(['city', 'Delhi'],['age','>',20])->get();
+	$users = User::whereRaw('age > 20')->get();
+	$users = User::whereRaw('age > ?',[20])->get();
+	
+	SELECT * FROM users WHERE city = 'Delhi' AND age > 20;
+	
+	$users = User::where('city', 'Delhi')->orWhere('age','>',20)->get();
+	SELECT * FROM users WHERE city = 'Delhi' OR age > 20;
+	
+	$users = User::whereCity('Delhi')->get();
+	SELECT * FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->select('name','age')->get();
+	SELECT name, age FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->select('name','age as user_age')->get();
+	SELECT name, age AS user_age FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->toSql();
+	$users = User::whereCity('Delhi')->toRawSql();
+	$users = User::whereCity('Delhi')->dd();
+	$users = User::whereCity('Delhi')->ddRawSql();
+	$users = User::whereCity('Delhi')->ddSql();
+	
+	$users = User::whereCity('Delhi')->first();
+	SELECT * FROM users WHERE city = 'Delhi' LIMIT 1;
+	
+	$users = User::where('age', '<>',20)->get();
+	$users = User::whereNot('age',20)->get();
+	
+	SELECT * FROM users WHERE age != 20 ;
+	
+	$users = User::whereBetween('age',[19,20])->get();
+	SELECT * FROM users WHERE age BETWEEN 19 and 20;
+	
+	$users = User::whereIn('city',['Delhi','Goa'])->get();
+	SELECT * FROM users WHERE city IN ('Delhi','Goa');
+	
+	$users = User::whereNotIn('city',['Delhi','Goa'])->get();
+	SELECT * FROM users WHERE city Not IN ('Delhi','Goa');
+	
+	
+	Where clause
+	
+	Product::where('status', 'publish');  
+	Product::where('status', '=', 'publish')
+	   
+	select * from `products` where `status` = 'publish' 
+	
+	Letest
+	
+	Product::where('status', 'publish')->latest();    
+	
+	select * from `products` where `status` = 'publish' order by `created_at` desc
+	
+	Oldest
+	
+	Product::where('status', 'publish')->oldest(); 
+	
+	select * from `products` where `status` = 'publish' order by `created_at` asc
+	
+	Where Null
+	
+	Product::where('status', 'publish')->latest()->whereNull('sale_price');
+	
+	select * from `products` where `status` = 'publish' and `sale_price` is null 
+	order by `created_at` desc
+	
+	Where Not Null
+	
+	Product::where('status', 'publish')->latest()->whereNotNull('sale_price');
+	
+	select * from `products` where `status` = 'publish' and `sale_price` is not null 
+	order by `created_at` desc
+	
+	Where sale_price = 0
+	
+	Product::where('status', 'publish')->latest()->where('sale_price', 0);
+	
+	select * from `products` where `status` = 'publish' and `sale_price` = 0 
+	order by `created_at` desc
+	
+	
+	Take and skip
+	
+	select * from `products` where `status` = 'publish' and `sale_price` = 0 
+	order by `created_at` desc limit 8 offset 3
+	
+	
+	Where Column Compare
+	
+	Product::where('status', 'publish')
+			->whereNotNull('sale_price')
+	       ->whereColumn('sale_price', '<', 'price') 
+	
+	select * from `products` where `status` = 'publish' 
+	and `sale_price` is not null and `sale_price` = 0 
+	order by `created_at` desc limit 8 offset 3
+	
+	
+	
+	Where and letest by id
+	
+	Product::latest('id')->where('status', 'publish');
+	
+	select * from `products` where `status` = 'publish' order by `id` desc
+	
+	
+	Where and Carbon for date
+	
+	User::onlyTrashed()->where('deleted_at', '<=', Carbon::now()->subDays(30));
+	
+	select * from `users` where `users`.`deleted_at` is not null 
+	and `deleted_at` <= '2026-08-16 22:49:11'
+	
+	
+	
+	Where and Like keyword
+	
+	Product::where('title', 'LIKE', "%$keyword%")
+	            ->orWhere('description', 'LIKE', "%$keyword%")
+	            ->get();
+	
+	select * from `products` where `title` like '%laptop%' or `description` like '%laptop%'
+	
+	
+	Select all :  yaha get lagana galat h
+	
+	Product::all(); 
+	Product::all() likhna aur Product::query()->get()
+	
+	select * from `products`;
+	
+	Where and Order by
+	Category::orderBy('name', 'asc')->where('status', 'active')->get()
+	Brand::orderBy('name', 'asc')->where('status', 'active')->get();
+	
+	select * from `categories` where `status` = 'active'  order by `name` asc;
+	select * from `brands` where `status` = 'active' order by `name` asc;
+	
+	
+	withTrashed matlab soft delete wale record bi do
+	$user = User::withTrashed()->where('email', $request->email)->first();
+	
+	SELECT * FROM users WHERE email = 'rahul@example.com'  LIMIT 1;
+	
+	
+	Select id and password via eloquent
+	$user = User::select('id', 'password')->where('id', Auth::user()->id)->first();
+	
+	SELECT `id`, `password` FROM `users` WHERE `id` = ? LIMIT 1
+	
+	Order List sql
+	$query = Order::where('user_id', $user->id)->orderBy('id', 'desc');
+	
+	SELECT * FROM `orders` WHERE `user_id` = 5 ORDER BY `id` DESC
+	
+	$query = Order::where('user_id', $user->id)->where('status', 'pending')->orderBy('id', 'desc');
+	$orders = Order::where('user_id', $user->id)->orderBy('id', 'desc')->get();
+	
+	Wishlist dekhna ka process  with('product') — Eager Loading (2 queries)
+	
+	$wishlists = Whishlist::where('user_id', Auth::user()->id)->with('product')->get();
+	
+	SELECT * FROM `whishlists` WHERE `user_id` = 5
+	
+	SELECT * FROM `products` WHERE `id` IN (10, 15, 22)
+	
+	कुल 2 Queries (N+1 nahi)
+	#	Query	Purpose
+	1	SELECT * FROM whishlists WHERE user_id = 5	Wishlists lana
+	2	SELECT * FROM products WHERE id IN (10, 15, 22)	Products lana
+	
+	
+	Step-by-step samjho:
+	$salesData = Order::select(
+        DB::raw("DATE_FORMAT(created_at, '%d') as date"),
+        DB::raw('SUM(grand_total) as total_sales')
+    )
+    ->where('created_at', '>=', Carbon::now()->subDays(6)->startOfDay())
+    ->groupBy('date')
+    ->orderBy('date', 'ASC')
+    ->get();
+	
+
+	Part	Kaam
+	Order::select(...)	orders table se data nikalna
+	DATE_FORMAT(created_at, '%d')	created_at date ko sirf din (day number) me convert karta hai, e.g. 05, 12, 28
+	as date	Us column ka alias date rakha
+	SUM(grand_total) as total_sales	Har din ka total sales ka sum
+	where('created_at', '>=', Carbon::now()->subDays(6)->startOfDay())	Aaj se 6 din pehle ki date ka start of day (00:00:00) se lekar ab tak ka data
+	groupBy('date')	Day ke hisaab se group karo (jaise 05, 06, 07...)
+	orderBy('date', 'ASC')	Din ascending order me sort karo
+	
+	
+	Eager Loading
+	Aap pehle hi bol dete ho: Laravel Eloquent mein iska purpose mainly N+1 Query Problem ko avoid karna hai.
+	
+	$query = CustomerReview::orderBy('id', 'asc')->with('user', 'product');
+	
+	Meaning:"customer_reviews saath user aur product relationships ka data bhi abhi load kar do."
+	Conceptually queries kuch is tarah hongi:
+	
+	SELECT * FROM customer_reviews;
+
+	SELECT * FROM users WHERE id IN (...);
+
+	SELECT * FROM products WHERE id IN (...);
+	
+	
+	Join query in ORM
+	$query = Shipping::Select('shipping_charges.*', 'countries.name as countryName')
+	            ->latest('id')
+	            ->leftJoin('countries', 'countries.id', 'shipping_charges.country_id');
+	
+	SELECT shipping_charges.*, countries.name as countryName FROM shipping_charges 
+	LEFT JOIN countries ON countries.id = shipping_charges.country_id 
+	ORDER BY shipping_charges.id DESC;
+	
+	Row SQL
+	
+	$subCategories = DB::select(" 
+		SELECT sub_categories.*, categories.name as categoryName 
+		FROM sub_categories 
+		LEFT JOIN categories ON categories.id = sub_categories.category_id 
+		ORDER BY sub_categories.id DESC 
+	");
