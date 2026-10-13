@@ -1,0 +1,301 @@
+	use App\Models\FcmToken;
+	
+	FcmToken::create([
+	    'user_id' => $userId,
+	    'fid' => $fid,
+	    'fcm_token' => $fcmToken,
+	    'device_type' => 'web'
+	]);
+	
+	FcmToken::upsert(
+	    [
+	        ['fid' => $fid, 'user_id' => $userId, 'fcm_token' => $fcmToken, 'device_type' => 'web']
+	    ],
+	    ['fid'], // Unique column to match
+	    ['fcm_token', 'user_id', 'updated_at'] // Columns to update if match found
+	);
+	
+	FcmToken::updateOrCreate(
+	    ['fid' => $fid], // Matching condition (Unique Key)
+	    [
+	        'user_id' => $userId,
+	        'fcm_token' => $fcmToken,
+	        'device_type' => 'web'
+	    ] // Update or Insert values
+	);
+	
+	User::destroy($id); // Primary ID se direct delete
+	
+	1. Step by step Eloquent ORM details. At the end use ->get() to get data
+	
+	if (User::where('id', 2)->exists()) {
+		// your code here
+	}
+	if (User::where('id', 2)->doesntExist()) {
+		// your code here
+	}
+	
+	$users = User::all();
+	SELECT * FROM users
+	
+	$users = User::select('name','age')->get();
+	$users = User::selectRaw('name,age')->get();
+	$users = User::orderBy('name','age')->get();
+	$users = User::orderByRaw('name,age')->get();
+	
+	
+	SELECT name, age FROM users;
+	
+	$users = User::find(2);
+	SELECT * FROM users WHERE id = 2
+	
+	$users = User::find(2,['name','age']);
+	SELECT name, age FROM users WHERE id = 2;
+	
+	$users = User::find(2,['name','age']);
+	SELECT name, age FROM users WHERE id = 2;
+	
+	$users = User::find([2,4],['name','age']);
+	SELECT name, age FROM users WHERE id IN (2,4);
+	
+	$users = User::count();
+	SELECT count(*) FROM users;
+	
+	$users = User::max('age');
+	SELECT max(age) FROM users;
+	
+	$users = User::min('age');
+	$users = User::max('age');
+	$users = User::sum('age');
+	
+	$users = User::where('city', 'Delhi')->get();
+	SELECT * FROM users WHERE city = 'Delhi';
+	
+	$users = User::where('city', 'Delhi')->where('age','>',20)->get();
+	$users = User::where(['city', 'Delhi'],['age','>',20])->get();
+	$users = User::whereRaw('age > 20')->get();
+	$users = User::whereRaw('age > ?',[20])->get();
+	
+	SELECT * FROM users WHERE city = 'Delhi' AND age > 20;
+	
+	$users = User::where('city', 'Delhi')->orWhere('age','>',20)->get();
+	SELECT * FROM users WHERE city = 'Delhi' OR age > 20;
+	
+	$users = User::whereCity('Delhi')->get();
+	SELECT * FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->select('name','age')->get();
+	SELECT name, age FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->select('name','age as user_age')->get();
+	SELECT name, age AS user_age FROM users WHERE city = 'Delhi';
+	
+	$users = User::whereCity('Delhi')->toSql();
+	$users = User::whereCity('Delhi')->toRawSql();
+	$users = User::whereCity('Delhi')->dd();
+	$users = User::whereCity('Delhi')->ddRawSql();
+	$users = User::whereCity('Delhi')->ddSql();
+	
+	$users = User::whereCity('Delhi')->first();
+	SELECT * FROM users WHERE city = 'Delhi' LIMIT 1;
+	
+	$users = User::where('age', '<>',20)->get();
+	$users = User::whereNot('age',20)->get();
+	
+	SELECT * FROM users WHERE age != 20 ;
+	
+	$users = User::whereBetween('age',[19,20])->get();
+	SELECT * FROM users WHERE age BETWEEN 19 and 20;
+	
+	$users = User::whereIn('city',['Delhi','Goa'])->get();
+	SELECT * FROM users WHERE city IN ('Delhi','Goa');
+	
+	$users = User::whereNotIn('city',['Delhi','Goa'])->get();
+	SELECT * FROM users WHERE city Not IN ('Delhi','Goa');
+	
+	
+	Where clause
+	
+	Product::where('status', 'publish');  
+	Product::where('status', '=', 'publish')
+	   
+	select * from `products` where `status` = 'publish' 
+	
+	Letest
+	
+	Product::where('status', 'publish')->latest();    
+	
+	select * from `products` where `status` = 'publish' order by `created_at` desc
+	
+	Oldest
+	
+	Product::where('status', 'publish')->oldest(); 
+	
+	select * from `products` where `status` = 'publish' order by `created_at` asc
+	
+	Where Null
+	
+	Product::where('status', 'publish')->latest()->whereNull('sale_price');
+	
+	select * from `products` where `status` = 'publish' and `sale_price` is null 
+	order by `created_at` desc
+	
+	Where Not Null
+	
+	Product::where('status', 'publish')->latest()->whereNotNull('sale_price');
+	
+	select * from `products` where `status` = 'publish' and `sale_price` is not null 
+	order by `created_at` desc
+	
+	Where sale_price = 0
+	
+	Product::where('status', 'publish')->latest()->where('sale_price', 0);
+	
+	select * from `products` where `status` = 'publish' and `sale_price` = 0 
+	order by `created_at` desc
+	
+	
+	Take and skip
+	
+	select * from `products` where `status` = 'publish' and `sale_price` = 0 
+	order by `created_at` desc limit 8 offset 3
+	
+	
+	Where Column Compare
+	
+	Product::where('status', 'publish')
+			->whereNotNull('sale_price')
+	       ->whereColumn('sale_price', '<', 'price') 
+	
+	select * from `products` where `status` = 'publish' 
+	and `sale_price` is not null and `sale_price` = 0 
+	order by `created_at` desc limit 8 offset 3
+	
+	
+	
+	Where and letest by id
+	
+	Product::latest('id')->where('status', 'publish');
+	
+	select * from `products` where `status` = 'publish' order by `id` desc
+	
+	
+	Where and Carbon for date
+	
+	User::onlyTrashed()->where('deleted_at', '<=', Carbon::now()->subDays(30));
+	
+	select * from `users` where `users`.`deleted_at` is not null 
+	and `deleted_at` <= '2026-08-16 22:49:11'
+	
+	
+	
+	Where and Like keyword
+	
+	Product::where('title', 'LIKE', "%$keyword%")
+	            ->orWhere('description', 'LIKE', "%$keyword%")
+	            ->get();
+	
+	select * from `products` where `title` like '%laptop%' or `description` like '%laptop%'
+	
+	
+	Select all :  yaha get lagana galat h
+	
+	Product::all(); 
+	Product::all() likhna aur Product::query()->get()
+	
+	select * from `products`;
+	
+	Where and Order by
+	Category::orderBy('name', 'asc')->where('status', 'active')->get()
+	Brand::orderBy('name', 'asc')->where('status', 'active')->get();
+	
+	select * from `categories` where `status` = 'active'  order by `name` asc;
+	select * from `brands` where `status` = 'active' order by `name` asc;
+	
+	
+	withTrashed matlab soft delete wale record bi do
+	$user = User::withTrashed()->where('email', $request->email)->first();
+	
+	SELECT * FROM users WHERE email = 'rahul@example.com'  LIMIT 1;
+	
+	
+	Select id and password via eloquent
+	$user = User::select('id', 'password')->where('id', Auth::user()->id)->first();
+	
+	SELECT `id`, `password` FROM `users` WHERE `id` = ? LIMIT 1
+	
+	Order List sql
+	$query = Order::where('user_id', $user->id)->orderBy('id', 'desc');
+	
+	SELECT * FROM `orders` WHERE `user_id` = 5 ORDER BY `id` DESC
+	
+	$query = Order::where('user_id', $user->id)->where('status', 'pending')->orderBy('id', 'desc');
+	$orders = Order::where('user_id', $user->id)->orderBy('id', 'desc')->get();
+	
+	Wishlist dekhna ka process  with('product') — Eager Loading (2 queries)
+	
+	$wishlists = Whishlist::where('user_id', Auth::user()->id)->with('product')->get();
+	
+	SELECT * FROM `whishlists` WHERE `user_id` = 5
+	
+	SELECT * FROM `products` WHERE `id` IN (10, 15, 22)
+	
+	कुल 2 Queries (N+1 nahi)
+	#	Query	Purpose
+	1	SELECT * FROM whishlists WHERE user_id = 5	Wishlists lana
+	2	SELECT * FROM products WHERE id IN (10, 15, 22)	Products lana
+	
+	
+	Step-by-step samjho:
+	$salesData = Order::select(
+        DB::raw("DATE_FORMAT(created_at, '%d') as date"),
+        DB::raw('SUM(grand_total) as total_sales')
+    )
+    ->where('created_at', '>=', Carbon::now()->subDays(6)->startOfDay())
+    ->groupBy('date')
+    ->orderBy('date', 'ASC')
+    ->get();
+	
+
+	Part	Kaam
+	Order::select(...)	orders table se data nikalna
+	DATE_FORMAT(created_at, '%d')	created_at date ko sirf din (day number) me convert karta hai, e.g. 05, 12, 28
+	as date	Us column ka alias date rakha
+	SUM(grand_total) as total_sales	Har din ka total sales ka sum
+	where('created_at', '>=', Carbon::now()->subDays(6)->startOfDay())	Aaj se 6 din pehle ki date ka start of day (00:00:00) se lekar ab tak ka data
+	groupBy('date')	Day ke hisaab se group karo (jaise 05, 06, 07...)
+	orderBy('date', 'ASC')	Din ascending order me sort karo
+	
+	
+	Eager Loading
+	Aap pehle hi bol dete ho: Laravel Eloquent mein iska purpose mainly N+1 Query Problem ko avoid karna hai.
+	
+	$query = CustomerReview::orderBy('id', 'asc')->with('user', 'product');
+	
+	Meaning:"customer_reviews saath user aur product relationships ka data bhi abhi load kar do."
+	Conceptually queries kuch is tarah hongi:
+	
+	SELECT * FROM customer_reviews;
+
+	SELECT * FROM users WHERE id IN (...);
+
+	SELECT * FROM products WHERE id IN (...);
+	
+	
+	Join query in ORM
+	$query = Shipping::Select('shipping_charges.*', 'countries.name as countryName')
+	            ->latest('id')
+	            ->leftJoin('countries', 'countries.id', 'shipping_charges.country_id');
+	
+	SELECT shipping_charges.*, countries.name as countryName FROM shipping_charges 
+	LEFT JOIN countries ON countries.id = shipping_charges.country_id 
+	ORDER BY shipping_charges.id DESC;
+	
+	Row SQL
+	
+	$subCategories = DB::select(" 
+		SELECT sub_categories.*, categories.name as categoryName 
+		FROM sub_categories 
+		LEFT JOIN categories ON categories.id = sub_categories.category_id 
+		ORDER BY sub_categories.id DESC 
+	");
